@@ -1,0 +1,30 @@
+rendering: False
+test: False
+fixed_life: True
+
+nb_experiments: 1
+random_seed: 1234
+nb_episodes: 250000
+printing_period: 100  # episodes, after which print on the screen
+writing_period: 100   # episodes, after which capture a data-point (averaged over this window)
+saving_period: 1000   # episodes, after which save on the disk (a bit time-consuming)
+episode_max_len: 250
+folder_location: '/results/'
+folder_name: 'lifegate_'
+
+state_mode: 'tabular'
+death_drag: 0.4
+
+explore_method: egreedy  # either of `secure` | `egreedy` | `softmax` | `count`
+target_eval: True  # True: greedy target is evaluated `nb_eval` times; False: training with exploration is reported
+nb_eval: 10
+
+init_q: 0.0
+gamma: 0.99
+alpha: 0.01
+epsilon: 1.0 # use 0.4 for e-greedy
+annealing: True
+final_epsilon: 0.25
+annealing_start_episode: 1000
+annealing_episodes: 2000
+learning_method: ql
