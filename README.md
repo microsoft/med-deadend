@@ -25,6 +25,13 @@ This paper can also be found on arXiv: [TBD](https://arxiv.org)
 
 -----
 
+## Transparency Information
+
+This project uses a generated cohort from the publicly available MIMIC III (version 1.4) dataset. The main data is available at [physionet.org](https://physionet.org/content/mimiciii/1.4/) and all the details and the code for generating the cohort is available at [Sepsis Cohort](https://github.com/microsoft/mimic_sepsis). For more information see `Step 0` from the `How to use` section bellow. 
+
+> Note: The documentation included in this ReadMe file is for informational purposes only and is not intended to supersede the applicable license terms.
+
+
 ## Contributing
 
 This code has been developed as part of the RL4H initiative at MSR Montreal. Most of the core work has been done by
