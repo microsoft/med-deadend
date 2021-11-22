@@ -81,7 +81,7 @@ Then from the root directory, run the following steps (tested on Windows and Lin
 
 Run `ipython ./data_process.py`
 
-The patient cohort provided in part 1 is extracted for general purposes. This script places the extracted trajectories into a more convenient format for the DeD learning processes and also constructs independent training, validation and test datasets. 
+The patient cohort provided in part 1 is extracted for general purposes. This script places the extracted trajectories into a more convenient format for the DeD learning processes and also constructs independent training, validation and test datasets. It also removes the raw-input columns from the observations (`o:input_total`, `o:input_4hourly`, and `o:max_dose_vaso`), if they are included by the the cohort generator.
 
 ---
 
