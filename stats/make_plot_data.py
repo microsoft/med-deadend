@@ -4,7 +4,7 @@ import yaml
 import numpy as np
 import pandas as pd
 import pyprind
-from stats.plot_utils import get_dn_rn_info, load_best_ai
+from stats.plot_utils import get_dn_rn_info, load_best_rl
 from stats.thresholds import th
 
 rng = np.random.RandomState(123)
@@ -27,10 +27,10 @@ encoded_test_data = pd.read_csv(os.path.join(root_dir_run, 'encoded_test_data.cs
 
 step_indices = [-19, -13, -7, -4, -3, -2]
 
-print("Loading best AI's and making Q-values ...")
-ai_dn = load_best_ai(root_dir_run, params, 'negative')
-ai_rn = load_best_ai(root_dir_run, params, 'positive')  # same params as D-Network
-data = get_dn_rn_info(ai_dn, ai_rn, encoded_test_data, sepsis_test_data)  # same AIS
+print("Loading best Q-Networks and making Q-values ...")
+qnet_dn = load_best_rl(root_dir_run, params, 'negative')  # Initialize the D-Network and load the best parameters
+qnet_rn = load_best_rl(root_dir_run, params, 'positive')  # Initialize the R-Network and laod the best parameters
+data = get_dn_rn_info(qnet_dn, qnet_rn, encoded_test_data, sepsis_test_data)  # Each Network use the same SC-Network(AIS)
 
 with open("./plots/value_data.pkl", "wb") as f:
     pickle.dump(data, f)

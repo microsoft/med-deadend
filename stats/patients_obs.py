@@ -9,7 +9,6 @@ import seaborn
 from stats.thresholds import th 
 
 rng = np.random.RandomState(123)
-figsize = (5, 5.5)  # (5, 3) for short and (5, 5.5) for full
 fontsize = 6.5
 
 OBS_PLOT = True
@@ -17,8 +16,14 @@ WRITE_META = True
 COMPLETE = True     # full list of vital vs. short list
 
 if OBS_PLOT:
-    if not os.path.exists(r"./plots/obs"):
-        os.mkdir(r"./plots/obs")
+    if COMPLETE:
+        folder_path = r"./plots/obs_complete"
+        figsize = (5, 5.5)
+    else:
+        folder_path = r"./plots/obs"
+        figsize = (6.2, 2.8)
+    if not os.path.exists(folder_path):
+        os.mkdir(folder_path)
 
 ROOT_DIR = r"."
 root_dir_mimic = os.path.join(ROOT_DIR, 'data', 'sepsis_mimiciii')
@@ -40,12 +45,6 @@ data["q_rn_a"] = data.apply(lambda x: x.q_rn[x.a], axis=1)
 data["IV"] = data.a.apply(lambda x: x // 5)
 data["VP"] = data.a.apply(lambda x: x % 5)
 
-data["sum_grad_q_dn"] = data.grad_q_dn.apply(lambda x: np.sum(x.reshape(25, 64), axis=1))
-data["sum_grad_q_rn"] = data.grad_q_rn.apply(lambda x: np.sum(x.reshape(25, 64), axis=1))
-
-data["sum_grad_q_a_dn"] = data.apply(lambda x: x.sum_grad_q_dn[x.a], axis=1)
-data["sum_grad_q_a_rn"] = data.apply(lambda x: x.sum_grad_q_rn[x.a], axis=1)
-
 for i in range(25):  # mk values of actions separately for plotting
     iv = i // 5
     vp = i % 5
@@ -64,25 +63,24 @@ print("selected trajs:")
 print(selected_trajs_idx)
 
 if COMPLETE:
-    vitals = sorted(["o:mechvent", "o:max_dose_vaso", "o:GCS", "o:HR", "o:SysBP", "o:MeanBP", 
+    vitals = sorted(["o:mechvent", "o:GCS", "o:HR", "o:SysBP", "o:MeanBP", 
               "o:DiaBP", "o:RR", "o:Temp_C", "o:FiO2_1", "o:Potassium", "o:Sodium", "o:Chloride", "o:Glucose", 
               "o:Magnesium", "o:Calcium", "o:Hb", "o:WBC_count", "o:Platelets_count", "o:PTT", "o:PT", "o:Arterial_pH", 
               "o:paO2", "o:paCO2", "o:Arterial_BE", "o:HCO3", "o:Arterial_lactate", "o:SOFA", "o:SIRS", "o:Shock_Index", 
               "o:PaO2_FiO2", "o:cumulated_balance", "o:SpO2", "o:BUN", "o:Creatinine", "o:SGOT", "o:SGPT", "o:Total_bili", 
-              "o:INR", "o:input_total", "o:input_4hourly", "o:output_total", "o:output_4hourly"])
+              "o:INR", "o:output_total", "o:output_4hourly"])
     clinical_measures = []
     clinical_measures_ttl = []
+    num_cols = 5
 else:
-    vitals = ["o:HR", "o:SysBP", "o:MeanBP", 
-              "o:DiaBP", "o:RR", "o:Temp_C", "o:Arterial_lactate", 
-              "o:SpO2", "o:BUN", "o:INR"]
-    clinical_measures = ["o:GCS", "o:SOFA", "o:SIRS", "o:max_dose_vaso", "o:input_4hourly"]
-    clinical_measures_ttl = ["GCS", "SOFA", "SIRS", "max dose VP", "Input 4-hourly"]
+    vitals = ["o:HR", "o:SysBP", "o:MeanBP", "o:DiaBP", "o:RR", "o:Temp_C", 
+              "o:Arterial_lactate", "o:SpO2", "o:BUN", "o:INR"]
+    clinical_measures = ["o:GCS", "o:SOFA", "o:SIRS"]
+    clinical_measures_ttl = ["GCS", "SOFA", "SIRS"]
+    num_cols = 7
 vitals = sorted([item for item in vitals if item not in clinical_measures])
 our_measures = ["v_dn", "v_rn", "q_dn_a", "q_rn_a"]
 our_measures_ttl = [r"$V_{D}$", r"$V_{R}$", r"$Q_{D}$", r"$Q_{R}$"]
-grad_measures = ["sum_grad_q_a_dn", "sum_grad_q_a_rn"]
-grad_ttl = [r"$\sum \nabla Q_{D}$", r"$\sum \nabla Q_{R}$"]
 
 if OBS_PLOT:
     plt.rcParams.update({'font.size': fontsize})
@@ -103,7 +101,6 @@ if OBS_PLOT:
                 onset_step = np.where(d["m:charttime"].values < d["m:presumed_onset"].values[0])[0][-1]
             except:
                 onset_step = 0
-            num_cols = 5
             num_rows_vitals = len(vitals) // num_cols + int(len(vitals) % num_cols > 0)
             num_rows_clinical = len(clinical_measures) // num_cols + int(len(clinical_measures) % num_cols > 0)
             num_rows_ours = len(our_measures) // num_cols + int(len(our_measures) % num_cols > 0)
@@ -151,7 +148,7 @@ if OBS_PLOT:
             # fig.suptitle("Traj:" + str(traj) +" icustay_id:" + str(icustayid), fontsize=9)
             seaborn.despine(fig=fig)
             plt.tight_layout(pad=0.7)
-            f_name = os.path.join(os.path.abspath(r"plots/obs"), "traj" + str(traj) +"_icustay" + str(icustayid) + ".pdf")
+            f_name = os.path.join(folder_path, "traj" + str(traj) +"_icustay" + str(icustayid) + ".pdf")
             fig.savefig(f_name)
             plt.close("all")
 

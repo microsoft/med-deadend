@@ -55,7 +55,7 @@ class Font:
     end = '\033[0m'
 
 
-class AI(object):
+class Q_Network(object):
     def __init__(self, state_shape, nb_actions, init_q, gamma, alpha, learning_method, rng, freeze=False):
         self.state_shape = list(state_shape)
         self.nb_actions = nb_actions
@@ -117,9 +117,9 @@ class AI(object):
         self._set_q(s, a, self.get_q(s, a) + self.alpha * delta)  # updating Q
 
 
-class AICount(AI):
+class QNetCount(Q_Network):
     """
-    Similar to AI, but with (s,a)-visit-counter capability
+    Similar to Q_Network, but with (s,a)-visit-counter capability
     """
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -150,11 +150,11 @@ class AICount(AI):
 
 
 class Experiment(object):
-    def __init__(self, ai, ai_explore, Q_R, env, saving_period, printing_period, writing_period, epsilon, final_epsilon,
+    def __init__(self, qnet, qnet_explore, Q_R, env, saving_period, printing_period, writing_period, epsilon, final_epsilon,
                  annealing_episodes, annealing, annealing_start_episode, learning_method, explore_method, rng,
                  episode_max_len, make_folder=True, folder_location='/results/', folder_name='tabular'):
-        self.ai = ai
-        self.ai_explore = ai_explore
+        self.qnet = qnet
+        self.qnet_explore = qnet_explore
         self.qr = Q_R
         self.rng = rng
         self.env = env
@@ -162,7 +162,7 @@ class Experiment(object):
         self.learning_method = learning_method
         self.explore_method = explore_method
         if explore_method in ['count', 'secure_count']:
-            assert isinstance(self.ai, AICount)
+            assert isinstance(self.qnet, QNetCount)
         self.last_state = None
         self.action = None
         self.epsilon = epsilon
@@ -204,7 +204,7 @@ class Experiment(object):
         for a in range(self.env.nb_actions):
             print("{:2} │ ".format(a), end="")
             for s in range(self.env.bridge_len):
-                print("{:6.2f} │ ".format(self.ai.get_q([s, 0, 0], a)), end="")
+                print("{:6.2f} │ ".format(self.qnet.get_q([s, 0, 0], a)), end="")
             print()
         print()
 
@@ -271,10 +271,10 @@ class Experiment(object):
                         self._plot_and_write(plot_dict={'action 2': a2}, loc=self.folder_name + "/a2",
                                              x_label="Eps.", y_label="Mean # of a2", title="", kind='line', legend=True)
 
-                        with open(self.folder_name + "/tabular_ai.pkl", 'wb') as f:
-                            pickle.dump(self.ai, f)
+                        with open(self.folder_name + "/tabular_qnet.pkl", 'wb') as f:
+                            pickle.dump(self.qnet, f)
                         with open(self.folder_name + "/tabular_qd.pkl", 'wb') as f:
-                            pickle.dump(self.ai_explore, f)
+                            pickle.dump(self.qnet_explore, f)
                         with open(self.folder_name + "/tabular_qr.pkl", 'wb') as f:
                             pickle.dump(self.qr, f)
                         with open(self.folder_name + "/tabular_experiment.pkl", 'wb') as f:
@@ -288,7 +288,7 @@ class Experiment(object):
         self.actions_hist = [0] * self.env.nb_actions
         self.reset()
         if is_learning and self.learning_method == 'fw_sarsa':
-            self.ai.new_episode()
+            self.qnet.new_episode()
         episode_return = 0
         while not self.episode_done:
             r = self._step(is_learning=is_learning)
@@ -297,7 +297,7 @@ class Experiment(object):
                 logger.warning('Reaching maximum number of steps in the current episode.')
                 self.episode_done = True
         if is_learning and self.learning_method == 'fw_sarsa':
-            self.ai.end_of_episode()
+            self.qnet.end_of_episode()
         if self.annealing and is_learning:
             self._anneal()
         return episode_return
@@ -318,7 +318,7 @@ class Experiment(object):
         if explore and self.rng.binomial(1, self.epsilon):
             action = self.rng.randint(self.env.nb_actions)
         else:
-            action = self.ai.get_max_action(s)
+            action = self.qnet.get_max_action(s)
         return action
 
     @staticmethod
@@ -335,29 +335,29 @@ class Experiment(object):
     def _get_softmax_action(self, s, explore):
         # uses AI policy
         if explore:
-            q = np.asarray([self.ai.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
+            q = np.asarray([self.qnet.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
             q = self.softmax(q)
             selector = self.rng.multinomial(1, q)
             action = int(np.where(selector == 1)[0])
         else:
-            action = self.ai.get_max_action(s)
+            action = self.qnet.get_max_action(s)
         return action
 
     def _get_count_based_action(self, s, explore):
         # uses AI policy
         if explore:
-            c = np.asarray([self.ai.get_count(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
-            q = np.asarray([self.ai.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
+            c = np.asarray([self.qnet.get_count(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
+            q = np.asarray([self.qnet.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
             q = q + (1.0 / (1.0 + c ** 0.5))  # plus count-based motivation
             actions = np.where(q == q.max())[0]
             action = self.rng.choice(actions)
         else:
-            action = self.ai.get_max_action(s)
+            action = self.qnet.get_max_action(s)
         return action
 
     def _get_secure_uniform_action(self, s):
         # Uniform and secure
-        q = np.asarray([self.ai_explore.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
+        q = np.asarray([self.qnet_explore.get_q(s, a) for a in range(self.env.nb_actions)], dtype=np.float64)
         if all(abs(q + 1) < 1e-5):  # if all values are -1
             return self.rng.randint(0, self.env.nb_actions)
         else:
@@ -369,12 +369,12 @@ class Experiment(object):
         if explore and self.rng.binomial(1, self.epsilon):
             action = self._get_secure_uniform_action(s)
         else:
-            action = self.ai.get_max_action(s)
+            action = self.qnet.get_max_action(s)
         return action
 
     def _get_secure_action_threshold(self, s, q_threshold):
         # Implementation of Theorem 2 of the paper (not used in the examples of the paper though).
-        q = np.asarray([self.ai.get_q(s, a) for a in range(self.env.nb_actions)])
+        q = np.asarray([self.qnet.get_q(s, a) for a in range(self.env.nb_actions)])
         q = q > q_threshold
         actions = np.where(q == True)[0]
         if len(actions) == 0:
@@ -394,7 +394,7 @@ class Experiment(object):
         action = self._get_action(self.last_state, is_learning)
         self.actions_hist[action] += 1
         if is_learning and self.explore_method in ['count', 'secure_count']:
-            self.ai.increment_count(self.last_state, action)
+            self.qnet.increment_count(self.last_state, action)
         s2, r_env, self.episode_done, _ = self.env.step(action)
         if r_env != 0:
             term = True
@@ -409,9 +409,9 @@ class Experiment(object):
             term_ex = True
 
         if is_learning:
-            self.ai.learn(self.last_state, action, r_env, s2, term)
+            self.qnet.learn(self.last_state, action, r_env, s2, term)
             # if self.explore_method in ['secure', 'secure_count']:
-            self.ai_explore.learn(self.last_state, action, min(r_env, 0.0), s2, term_ex) # Reward will be 0.0 unless we experience a 'death' transition
+            self.qnet_explore.learn(self.last_state, action, min(r_env, 0.0), s2, term_ex) # Reward will be 0.0 unless we experience a 'death' transition
             self.qr.learn(self.last_state, action, max(0, r_env), s2, term_ex)           # Reward will be 0.0 unless we experience a 'recovery' transition
 
         self.last_state = deepcopy(s2)

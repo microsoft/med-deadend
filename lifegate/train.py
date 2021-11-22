@@ -7,7 +7,7 @@ import numpy as np
 
 from lifegate import LifeGate
 # from lifegate_utils import Font
-from ai import AI, AICount, Experiment
+from q_networks import Q_Network, QNetCount, Experiment
 
 # np.set_printoptions(suppress=True, linewidth=200, precision=3)
 floatX = 'float32'
@@ -33,9 +33,9 @@ def worker(params):
 
     if params['test'] is True:
         # remember to pass correct `folder_name` when call with test==True
-        file_path = os.getcwd() + params['folder_location'] + params['folder_name'] + '/tabular_ai.pkl'
+        file_path = os.getcwd() + params['folder_location'] + params['folder_name'] + '/tabular_qnet.pkl'
         with open(file_path, 'rb') as f:
-            ai = pickle.load(f)
+            qnet = pickle.load(f)
         env = LifeGate(max_steps=params['episode_max_len'], bridge_len=params['bridge_len'], state_mode='tabular',
                         rendering=True, image_saving=False, render_dir=None, rng=random_state)
         s = env.reset()
@@ -44,7 +44,7 @@ def worker(params):
         while not term:
             print('=' * 50)
             action = int(input('>>> Action: '))
-            print(Font.bold + '>>> Q: ' + Font.end, [ai.get_q(s, a) for a in range(env.nb_actions)])
+            print(Font.bold + '>>> Q: ' + Font.end, [qnet.get_q(s, a) for a in range(env.nb_actions)])
             s, r, term, info = env.step(action)
             print('reward: ', r, ' | term: ', term, ' | info: ', info)
             env.render()
@@ -55,24 +55,24 @@ def worker(params):
             print('\n')
             env = LifeGate(params['state_mode'], random_state, params['death_drag'], fixed_life=params['fixed_life'], 
                             rendering=False, image_saving=False, render_dir=None)
-            # --- MAIN AI ---
+            # --- MAIN Q-Network ---
             if params['explore_method'] in ['count', 'secure_count', 'secure']:
-                ai = AICount(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions,
+                qnet = QNetCount(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions,
                                 init_q=params['init_q'], gamma=params['gamma'], alpha=params['alpha'],
                                 learning_method=params['learning_method'], rng=random_state)
             else:
-                ai = AI(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=params['init_q'],
+                qnet = Q_Network(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=params['init_q'],
                         gamma=params['gamma'], alpha=params['alpha'], learning_method=params['learning_method'],
                         rng=random_state)
             # --- Q_d and Q_r Networks ---
-            q_d = AI(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=np.float32(0),
+            q_d = Q_Network(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=np.float32(0),
                             gamma=np.float32(1), alpha=params['alpha'], learning_method='ql', rng=random_state)
             
-            q_r = AI(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=np.float32(0),
+            q_r = Q_Network(state_shape=env.tabular_state_shape, nb_actions=env.nb_actions, init_q=np.float32(0),
                             gamma=np.float32(1), alpha=params['alpha'], learning_method='ql', rng=random_state)
 
             # --- EXPERIMENT ---
-            expt = Experiment(ai=ai, ai_explore=q_d, Q_R=q_r, env=env, saving_period=params['saving_period'],
+            expt = Experiment(qnet=qnet, qnet_explore=q_d, Q_R=q_r, env=env, saving_period=params['saving_period'],
                               printing_period=params['printing_period'], writing_period=params['writing_period'],
                               learning_method=params['learning_method'], explore_method=params['explore_method'],
                               epsilon=params['epsilon'], annealing_start_episode=params['annealing_start_episode'],

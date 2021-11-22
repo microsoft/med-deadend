@@ -1,4 +1,4 @@
-# lifegate
+# LifeGate
 *Tabular example* for the medical dead-end paper
 
 # How to run:

@@ -23,52 +23,16 @@ root_dir_run = os.path.join(ROOT_DIR, 'results', 'run1')
 params = yaml.safe_load(open(os.path.join(root_dir_run, 'config.yaml'), 'r'))  # the used params in the given run directory
 
 print("Loading data ...")
-sepsis_raw_data = pd.read_csv(os.path.join(root_dir_mimic, 'sepsis_final_data_K1_RAW.csv'))
 with open(r"./plots/value_data.pkl", "rb") as f:
     data = pickle.load(f)
+with open(r"./plots/flag_data.pkl", "rb") as f:
+    bokeh = pickle.load(f)
 print("Done.")
 
-
-def get_values(info, type_q):  # type_q = 'selected', 'median', 'min', 'max', 'mean'
-    plt.rcParams.update({'font.size': 7})
-    hr_death, bins_r_death = np.histogram(info['death']['rn_'+ type_q + '_q'], np.linspace(0, 1, num=11, endpoint=True), density=False)
-    hd_death, bins_d_death = np.histogram(info['death']['dn_' + type_q + '_q'], np.linspace(-1, 0, num=11, endpoint=True), density=False)
-    hr_recovery, bins_r_recovery = np.histogram(info['recovery']['rn_' + type_q + '_q'], np.linspace(0, 1, num=11, endpoint=True), density=False)
-    hd_recovery, bins_d_recovery = np.histogram(info['recovery']['dn_' + type_q + '_q'], np.linspace(-1, 0, num=11, endpoint=True), density=False)
-    hr_death = hr_death / hr_death.sum()
-    hd_death = hd_death / hd_death.sum()
-    hr_recovery = hr_recovery / hr_recovery.sum()
-    hd_recovery = hd_recovery / hd_recovery.sum()
-    hd_death = np.array([hd_death[:-2].sum(), hd_death[-2], hd_death[-1]])
-    hr_death = np.array([hr_death[:-2].sum(), hr_death[-2], hr_death[-1]])
-    hd_recovery = np.array([hd_recovery[:-2].sum(), hd_recovery[-2], hd_recovery[-1]])
-    hr_recovery = np.array([hr_recovery[:-2].sum(), hr_recovery[-2], hr_recovery[-1]])
-    return hr_death, hr_recovery, hd_death, hd_recovery
-
-bokeh = {"time": [], "survivors": {}, "nonsurvivors": {}}
-for i in ["survivors", "nonsurvivors"]:
-    bokeh[i] = {"V_D": {"red": [], "yellow": [], "noflag": []}, "Q_D": {"red": [], "yellow": [], "noflag": []}, 
-                "V_R": {"red": [], "yellow": [], "noflag": []}, "Q_R": {"red": [], "yellow": [], "noflag": []}}
 q_types = ['selected', 'median']
 # step_indeces = [-2, -3, -4, -7, -13, -19]
 step_indeces = [-19, -13, -7, -4, -3, -2]
-plots = dict()
 
-for i, testing_idx in enumerate(step_indeces):
-    bokeh["time"].append(str((testing_idx + 1) * 4) + " Hours")
-    print("Computing information for test data, step index {0}".format(testing_idx))
-    info = get_state_value_info(testing_idx, data)
-    for typ in q_types:
-        value = "Q" if typ == "selected" else "V"
-        hr_death, hr_recovery, hd_death, hd_recovery = get_values(info, type_q=typ)
-        for f_idx, flag in enumerate(["red", "yellow", "noflag"]):
-            bokeh["survivors"][value + "_R"][flag].append(hr_recovery[f_idx])
-            bokeh["survivors"][value + "_D"][flag].append(hd_recovery[f_idx])
-            bokeh["nonsurvivors"][value + "_R"][flag].append(hr_death[f_idx])
-            bokeh["nonsurvivors"][value + "_D"][flag].append(hd_death[f_idx])
-
-# with open(os.path.join(ROOT_DIR, "circular_data.pkl"), "wb") as f:
-#     pickle.dump(bokeh, f)
 
 # Hist plot of values
 plt.rcParams.update({'font.size': 7})
@@ -169,34 +133,3 @@ for jj, trajectories in enumerate([nonsurvivor_trajectories, survivor_trajectori
     info[traj_type]["a_traj"] = a_traj
     info[traj_type]["dn_v_median_traj"] = [np.median(q, axis=1) for q in dn_q_traj]
     info[traj_type]["rn_v_median_traj"] = [np.median(q, axis=1) for q in rn_q_traj]
-
-sur = []
-for k in range(len(survivor_trajectories)):
-    q_dn = info['survivors']['dn_q_selected_traj'][k]
-    v_dn = info['survivors']['dn_v_median_traj'][k]
-    q_rn = info['survivors']['rn_q_selected_traj'][k]
-    v_rn = info['survivors']['rn_v_median_traj'][k]
-    a = info['survivors']['a_traj'][k]
-    cond = np.logical_and(v_dn < th.dn_red, v_rn < th.rn_red)
-    if True in cond:
-        sur.append([cond, q_dn, q_rn, a])
-        occurs = np.where(cond == True)[0]
-        print()
-        print(occurs)
-        print(q_dn)
-        print(q_rn)
-        break
-        # for t in occurs:
-            
-for k in sur:
-    a = ["{0:0.1f} ".format(m) for m in k[1]]
-    b = ["{0:0.1f} ".format(m) for m in k[2]]
-    s1, s2 = "", ""
-    for m, n in zip(a,b):
-        s1 += m
-        s2 += n
-    print(k[0])
-    print(s1)
-    print(s2)
-    print(k[3])
-    print("-"*40)

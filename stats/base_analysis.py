@@ -1,6 +1,7 @@
 import os
 import pickle
 import yaml
+import itertools
 import numpy as np
 import torch
 import pandas as pd
@@ -142,20 +143,19 @@ for category in [1, -1]:
 ## VITALS:
 
 if COMPLETE:
-    vitals = sorted(["o:mechvent", "o:max_dose_vaso", "o:GCS", "o:HR", "o:SysBP", "o:MeanBP", 
+    vitals = sorted(["o:mechvent", "o:GCS", "o:HR", "o:SysBP", "o:MeanBP", 
               "o:DiaBP", "o:RR", "o:Temp_C", "o:FiO2_1", "o:Potassium", "o:Sodium", "o:Chloride", "o:Glucose", 
               "o:Magnesium", "o:Calcium", "o:Hb", "o:WBC_count", "o:Platelets_count", "o:PTT", "o:PT", "o:Arterial_pH", 
               "o:paO2", "o:paCO2", "o:Arterial_BE", "o:HCO3", "o:Arterial_lactate", "o:SOFA", "o:SIRS", "o:Shock_Index", 
               "o:PaO2_FiO2", "o:cumulated_balance", "o:SpO2", "o:BUN", "o:Creatinine", "o:SGOT", "o:SGPT", "o:Total_bili", 
-              "o:INR", "o:input_total", "o:input_4hourly", "o:output_total", "o:output_4hourly"])
+              "o:INR", "o:output_total", "o:output_4hourly"])
     clinical_measures = []
     clinical_measures_ttl = []
 else:
-    vitals = ["o:HR", "o:SysBP", "o:MeanBP", 
-              "o:DiaBP", "o:RR", "o:Temp_C", "o:Arterial_lactate", 
-              "o:SpO2", "o:BUN", "o:INR"]
-    clinical_measures = ["o:GCS", "o:SOFA", "o:SIRS", "o:max_dose_vaso", "o:input_4hourly"]
-    clinical_measures_ttl = ["GCS", "SOFA", "SIRS", "max dose VP", "Input 4-hourly"]
+    vitals = ["o:HR", "o:SysBP", "o:MeanBP", "o:DiaBP", "o:RR", "o:Temp_C", 
+              "o:Arterial_lactate", "o:SpO2", "o:BUN", "o:INR"]
+    clinical_measures = ["o:GCS", "o:SOFA", "o:SIRS"]
+    clinical_measures_ttl = ["GCS", "SOFA", "SIRS"]
 vitals = sorted([item for item in vitals if item not in clinical_measures])
 our_measures = ["v_dn", "v_rn", "q_dn_a", "q_rn_a"]
 our_measures_ttl = [r"$V_{D}$", r"$V_{R}$", r"$Q_{D}$", r"$Q_{R}$"]
@@ -165,7 +165,7 @@ if COMPLETE:
     figsize = (6, 7)
 else:
     f_name = r"./plots/pre_post_flag_vitals.pdf"
-    figsize = (5, 3)
+    figsize = (5.5, 3)
 plt.rcParams.update({'font.size': 7})
 num_cols = 5
 num_rows_vitals = len(vitals) // num_cols + int(len(vitals) % num_cols > 0)
@@ -245,7 +245,7 @@ fig.savefig(f_name)
 
 ## TREATMETNS
 
-fig, axs = plt.subplots(2, 1, figsize=(1.1, 2.7), dpi=300, sharex=True)
+fig, axs = plt.subplots(2, 1, figsize=(1.05, 2.05), dpi=300, sharex=True)
 for i, item in enumerate(["IV", "VP"]):
     ax = axs[i]
     seaborn.lineplot(x="step", y=item, data=monitor_pos, legend=False, color="green", ci="sd", linewidth=1, ax=ax)
@@ -260,3 +260,178 @@ seaborn.despine()
 fig.tight_layout()
 fig.savefig(r"./plots/pre_post_flag_treatments.pdf")
 
+
+## DURATION ANALYSIS
+
+def autolabel(ax, rects, hist, total):
+    # Attach a text label above each bar in *rects*, displaying its height/value.
+    for k, rect in enumerate(rects):
+        height = rect.get_height()
+        # h = str(round(height, 1))
+        h = str(hist[k]) + " (" + str(total[k]) + ")"
+        ax.annotate(h,
+            xy=(rect.get_x() + rect.get_width() / 2, height),
+            xytext=(0, 2),  # points vertical offset
+            textcoords="offset points",
+            ha='center', va='bottom', fontsize=5.5, rotation=90)
+
+
+# testing dead-ends and if enter, stays in dead-end, and getting hists
+def hitflag(trajs, data, x_hours, th_dn_red, th_dn_yel, th_rn_red, th_rn_yel):
+    x = np.array([len(data[data.traj == k]["a"]) for k in trajs])
+    x = len(x[x >= (x_hours / 4)])  # 12H == at lease 4 steps
+    just_flag_red = []
+    remain_on_flag_red = []
+    just_flag_yel = []
+    remain_on_flag_yel = []
+    no_flag_at_start = []
+    for traj in trajs:
+        q_dn_traj = data[data.traj == traj]['q_dn'].tolist()
+        v_dn_traj = np.array([func(q) for q in q_dn_traj], dtype=np.float32)
+        q_rn_traj = data[data.traj == traj]['q_rn'].tolist()
+        v_rn_traj = np.array([func(q) for q in q_rn_traj], dtype=np.float32)
+        if len(v_dn_traj) <= x_hours / 4:
+            continue
+        cond_red = np.logical_and(v_dn_traj < th_dn_red, v_rn_traj < th_rn_red)
+        cond_yel = np.logical_or(np.logical_and.reduce((v_dn_traj <= th_dn_yel, v_dn_traj >= th_dn_red, v_rn_traj <= th_rn_yel)),
+                        np.logical_and.reduce((v_rn_traj <= th_rn_yel, v_rn_traj >= th_rn_red, v_dn_traj <= th_dn_yel)))
+        cond_both = np.logical_and(v_dn_traj < th_dn_yel, v_rn_traj < th_rn_yel)
+        for flag in ["red", "yel"]:
+            cond = cond_red if flag == "red" else cond_yel
+            just_flag = just_flag_red if flag == "red" else just_flag_yel
+            remain_on_flag = remain_on_flag_red if flag == "red" else remain_on_flag_yel
+            # analysis of `last` x_hours:
+            if True in cond:
+                # first_occur = np.where(cond == True)[0][0]
+                t = -(x_hours//4 + 1)
+                if all(cond[t:]):  # hit and stay on
+                    remain_on_flag.append(traj)
+                elif any(cond[t:]):  # only hit (but flase in the above condition)
+                    just_flag.append(traj)
+            # analysis of `first` x_hours
+        if not any(cond_both[:(x_hours//4 + 1)]):  # no flag at the beginning
+            no_flag_at_start.append(traj)
+
+    for flag in ["red", "yel"]:
+        just_flag = just_flag_red if flag == "red" else just_flag_yel
+        remain_on_flag = remain_on_flag_red if flag == "red" else remain_on_flag_yel
+        print("{0:.1f}% test cases ({1} out of {2}) END with {3} flag of at least {4}H".format(100*len(remain_on_flag)/x, len(remain_on_flag), x, flag, x_hours))
+    print("{0:.1f}% test cases ({1} out of {2}) START with NO flag of at least {3}H".format(100*len(no_flag_at_start)/x, len(no_flag_at_start), x, x_hours))
+    
+    return x, remain_on_flag_red, remain_on_flag_yel, no_flag_at_start
+
+
+def mk_hist(trajs, data, th_dn_red, th_dn_yel, th_rn_red, th_rn_yel):
+    a = list(data.groupby("traj").a)
+    max_len = max([len(k[1]) for k in a])
+    red_hist = np.zeros(max_len, dtype=np.int64)
+    yellow_hist = np.zeros(max_len, dtype=np.int64)
+    trajs_len = np.zeros(max_len + 1, dtype=np.int64)
+    for traj in trajs:
+        trajs_len[data[data.traj==traj].shape[0]] += 1  # first element corresponds to len of zero
+        q_dn_traj = data[data.traj == traj]['q_dn'].tolist()
+        v_dn_traj = np.array([func(q) for q in q_dn_traj], dtype=np.float32)
+        q_rn_traj = data[data.traj == traj]['q_rn'].tolist()
+        v_rn_traj = np.array([func(q) for q in q_rn_traj], dtype=np.float32)
+        cond_red = np.logical_and(v_dn_traj < th_dn_red, v_rn_traj < th_rn_red)
+        cond_yel = np.logical_or(np.logical_and.reduce((v_dn_traj <= th_dn_yel, v_dn_traj >= th_dn_red, v_rn_traj <= th_rn_yel)),
+                        np.logical_and.reduce((v_rn_traj <= th_rn_yel, v_rn_traj >= th_rn_red, v_dn_traj <= th_dn_yel)))
+        for flag in ["red", "yel"]:
+            cond = cond_red if flag == "red" else cond_yel
+            h = red_hist if flag == "red" else yellow_hist
+            for k, it in itertools.groupby(cond):
+                if k == True:
+                    h[len(list(it)) - 1] += 1  # list(it) == sequence of k (k == True); 1st element corresponds to len of 1 (not 0)
+    return red_hist, yellow_hist, trajs_len
+
+
+pos_trajs = data[data.category == 1].traj.unique()
+neg_trajs = data[data.category == -1].traj.unique()
+
+if ANALISYS:
+    plt.rcParams.update({'font.size': 7})
+    fig = plt.figure(figsize =(4.5, 1.75), dpi=300)
+    w = 0.3
+    d = {}
+    for k, trajs in zip(["Nonsurvivors", "Survivors"], [neg_trajs, pos_trajs]):
+        d[k] = {"duration": [], "ln": [], "remain_red": [], "remain_yel": [], "noflagstart": []}
+        print()
+        print("*"*30)
+        print(k)
+        for h in [4, 8, 12, 24, 48]:
+            ln, remain_red, remain_yel, noflagstart = hitflag(trajs, data, h, th.dn_red, th.dn_yel, th.rn_red, th.rn_yel)
+            print("="*30)
+            d[k]["remain_red"].append(len(remain_red))
+            d[k]["remain_yel"].append(len(remain_yel))
+            d[k]["noflagstart"].append(len(noflagstart))
+            d[k]["ln"].append(ln)
+            d[k]["duration"].append(h)
+    
+    t = np.arange(len(d["Survivors"]["duration"]))
+    yticks = [[0, 10, 20], [0, 10, 20], [0, 50, 100], [0, 50, 100]]
+    for idx, k in enumerate(['remain_red', 'remain_yel', 'noflagstart']):
+        ax = fig.add_subplot(1, 3, idx+1) 
+        xneg = np.array(d["Nonsurvivors"][k]) * 100 / np.array(d["Nonsurvivors"]["ln"])
+        xpos = np.array(d["Survivors"][k]) * 100 / np.array(d["Survivors"]["ln"])
+        rects1 = ax.bar(t-w/2-0.05, xneg, w, label="Nonsurvivors patients", color="blue")
+        rects2 = ax.bar(t+w/2+0.05, xpos, w, label="Survivors patients", color="green")
+        xticklables = [str(j) + " H" for j in d["Survivors"]["duration"]]
+        ax.set_xticks(t)
+        ax.set_xticklabels(xticklables)
+        ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
+        ax.set_ylim(yticks[idx][0], yticks[idx][-1])
+        ax.set_yticks(yticks[idx])
+        ax.set_yticklabels([str(j) + r"%" for j in yticks[idx]])
+        seaborn.despine()
+        autolabel(ax, rects1, d["Nonsurvivors"][k], d["Nonsurvivors"]["ln"])
+        autolabel(ax, rects2, d["Survivors"][k], d["Survivors"]["ln"])
+        ax.tick_params(axis='both', which='major', labelsize=7, length=7, width=0.8, direction='out')
+        fig.tight_layout()
+    fig.savefig(r"plots\duration_start_end.pdf", dpi=300)
+
+
+if DURATION_HIST:
+    red_hist_neg, yellow_hist_neg, trajs_len_neg = mk_hist(neg_trajs, data, th.dn_red, th.dn_yel, th.rn_red, th.rn_yel)
+    red_hist_pos, yellow_hist_pos, trajs_len_pos = mk_hist(pos_trajs, data, th.dn_red, th.dn_yel, th.rn_red, th.rn_yel)
+
+    trajs_len_neg = np.cumsum(trajs_len_neg)  # element i == num patients with at most i steps (rationally x[0] == 0)
+    trajs_len_neg = trajs_len_neg[-1] - trajs_len_neg  # last elmt was total num; here: i elmt == num with at least i steps
+    trajs_len_pos = np.cumsum(trajs_len_pos)
+    trajs_len_pos = trajs_len_pos[-1] - trajs_len_pos 
+    trajs_len_neg = trajs_len_neg[:10]  # for len>36H we consider 9 steps or more
+    trajs_len_pos = trajs_len_pos[:10]
+
+    red_hist_neg = np.append(red_hist_neg[:9], red_hist_neg[9:].sum())
+    yellow_hist_neg = np.append(yellow_hist_neg[:9], yellow_hist_neg[9:].sum())
+    red_hist_pos = np.append(red_hist_pos[:9], red_hist_pos[9:].sum())
+    yellow_hist_pos = np.append(yellow_hist_pos[:9], yellow_hist_pos[9:].sum())
+
+    xneg = red_hist_neg * 100 / trajs_len_neg
+    xneg_cum = np.cumsum(xneg)
+    xpos = red_hist_pos * 100 / trajs_len_pos
+    xpos_cum = np.cumsum(xpos)
+
+    fig, ax = plt.subplots(1, 1, figsize=(3, 1.75), dpi=300)
+    t = np.arange(len(red_hist_neg))
+    w = 0.3
+    rects1 = ax.bar(t-w/2-0.05, xneg, w, label="Nonsurvivors (" + str(len(neg_trajs)) + " patients total)", color="blue")
+    rects2 = ax.bar(t+w/2+0.05, xpos, w, label="Survivors (" + str(len(pos_trajs)) + " patients total)", color="green")
+    xticklables = [str(4*(k+1))+" H" for k in t]
+    xticklables[-1] = ">36 H"
+    ax.set_xticks(t)
+    ax.set_xticklabels(xticklables)
+    ax.set_xticklabels(ax.get_xticklabels(), rotation=90, ha="center")
+    ax.set_yticks([0, 5, 10, 15, 20])
+    ax.set_yticklabels(['0%', '5%', '10%', '15%', '20%'])
+    # ax.set_xlabel("Flag Duration", fontsize=7)
+    # ax.set_ylabel(r"% Patients", fontsize=7)
+    seaborn.despine()
+    leg = ax.legend(loc='upper right', prop={'size': 7})
+    leg.get_frame().set_linewidth(0.0)
+    leg.get_frame().set_facecolor('none')  # rm bg of legend
+
+    autolabel(ax, rects1, red_hist_neg, trajs_len_neg)
+    autolabel(ax, rects2, red_hist_pos, trajs_len_pos)
+    ax.tick_params(axis='both', which='major', labelsize=7, length=7, width=0.8, direction='out')
+    fig.tight_layout()
+    fig.savefig(r"plots\duration_each.pdf", dpi=300)

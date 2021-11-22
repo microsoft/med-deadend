@@ -69,7 +69,7 @@ class QNetwork_6464(nn.Module):
         return x
 
 
-class AI(object):
+class RL(object):
     def __init__(self, state_dim, nb_actions, gamma,
                  learning_rate, update_freq,use_ddqn,
                  rng, device, sided_Q, network_size):
@@ -98,10 +98,10 @@ class AI(object):
         self.sided_Q = sided_Q
 
     def train_on_batch(self, s, a, r, s2, t):
-        s  = torch.FloatTensor(s).to(self.device)
-        s2 = torch.FloatTensor(s2).to(self.device)
-        a  = torch.LongTensor(a).to(self.device)
-        r  = torch.FloatTensor(r).to(self.device)
+        s  = torch.FloatTensor(np.float32(s)).to(self.device)
+        s2 = torch.FloatTensor(np.float32(s2)).to(self.device)
+        a  = torch.LongTensor(np.int64(a)).to(self.device)
+        r  = torch.FloatTensor(np.float32(r)).to(self.device)
         t  = torch.FloatTensor(np.float32(t)).to(self.device)
 
         q = self.network(s)
@@ -130,10 +130,10 @@ class AI(object):
         return loss.detach().cpu().numpy()
 
     def get_loss(self, s, a, r, s2, t):
-        s  = torch.FloatTensor(s).to(self.device)
-        s2 = torch.FloatTensor(s2).to(self.device)
-        a  = torch.LongTensor(a).to(self.device)
-        r  = torch.FloatTensor(r).to(self.device)
+        s  = torch.FloatTensor(np.float32(s)).to(self.device)
+        s2 = torch.FloatTensor(np.float32(s2)).to(self.device)
+        a  = torch.LongTensor(np.int64(a)).to(self.device)
+        r  = torch.FloatTensor(np.float32(r)).to(self.device)
         t  = torch.FloatTensor(np.float32(t)).to(self.device)
 
         with torch.no_grad():
@@ -169,22 +169,6 @@ class AI(object):
 
     def get_action(self, states):
         return self.get_max_action(states)
-    
-    def get_grad(self, s):
-        # added for the second project
-        grads = []
-        s = torch.FloatTensor(s).to(self.device).unsqueeze(0)
-        s.requires_grad = True
-        q = self.network(s)
-        for a_idx in range(self.nb_actions):
-            a = torch.LongTensor([a_idx]).to(self.device)
-            q_a = q.gather(1, a.unsqueeze(1)).squeeze(1)
-            grads.append( torch.autograd.grad(inputs=s, outputs=q_a, retain_graph=True)[0].to('cpu').numpy().tolist() )
-            # TODO: ^ autograd makes an extra redundant inner dimension; should be removed. Test what happens if input `s` is multi-dim.
-        grads = np.array(grads)  # rows == actions, cols == state_variables (extera dim between rows and cols)
-        grads[abs(grads) < 0.01] = 0  # noise removal
-        grads[grads > 0] = 0          # only keeping negative grads (Q decreases)
-        return grads
 
     def learn(self, s, a, r, s2, term):
         """ Learning from one minibatch """

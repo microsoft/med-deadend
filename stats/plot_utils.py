@@ -1,54 +1,46 @@
 import os
-import yaml
 import numpy as np
 import torch
 import pandas as pd
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-import seaborn
 import matplotlib.pyplot as plt
 import pyprind
 
-from ai import AI
-from cortex import Cortex
+from rl import RL
 
 np.random.seed(586)
 torch.manual_seed(586)
 rng = np.random.RandomState(586)
 
-from IPython.core import debugger
-debug = debugger.Pdb().set_trace
 
-def load_best_ai(root_dir_run, params, sided_Q):
-    checkpoint_dir = os.path.join(root_dir_run, 'ai_' + sided_Q + '_checkpoints')
+def load_best_rl(root_dir_run, params, sided_Q):
+    checkpoint_dir = os.path.join(root_dir_run, 'rl_' + sided_Q + '_checkpoints')
     f = os.listdir(checkpoint_dir)
     f = [k for k in f if k[-3:] == ".pt"]
     last_checkpoint_idx = max([int(k[10:][:-3]) for k in f])
-    last_ai_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint' + str(last_checkpoint_idx) + '.pt'))
-    best_ai = np.argmin(last_ai_checkpoint['validation_loss'])
-    print("Best AI: ", best_ai, ' :: ', root_dir_run)
-    best_ai_check_point = torch.load(os.path.join(checkpoint_dir, 'checkpoint' + str(best_ai) + '.pt'))
-    ai = AI(state_dim=params['ais_size'], nb_actions=25, gamma=1.0, learning_rate=0, update_freq=0, 
-            use_ddqn=False, rng=rng, device='cpu', sided_Q=sided_Q, network_size=params['ai_network_size'])
-    ai.network.load_state_dict(best_ai_check_point['ai_network_state_dict'])
-    print("AI loaded")
-    return ai
+    last_rl_checkpoint = torch.load(os.path.join(checkpoint_dir, 'checkpoint' + str(last_checkpoint_idx) + '.pt'))
+    best_rl = np.argmin(last_rl_checkpoint['validation_loss'])
+    print("Best Q-Network: ", best_rl, ' :: ', root_dir_run)
+    best_rl_check_point = torch.load(os.path.join(checkpoint_dir, 'checkpoint' + str(best_rl) + '.pt'))
+    rl = RL(state_dim=params['embed_state_dim'], nb_actions=25, gamma=1.0, learning_rate=0, update_freq=0, 
+            use_ddqn=True, rng=rng, device='cpu', sided_Q=sided_Q, network_size=params['rl_network_size'])
+    rl.network.load_state_dict(best_rl_check_point['rl_network_state_dict'])
+    print("Q-Network loaded")
+    return rl
 
 
-def get_dn_rn_info(ai_dn, ai_rn, encoded_data, sepsis_data):
-    traj_indeces = encoded_data['traj'].unique()
-    data = {'traj': [], 'step': [], 's': [], 'a': [], 'q_dn': [], 'q_rn': [], 'category': [], 
-            'grad_q_dn': [], 'grad_q_rn': []}
+def get_dn_rn_info(qnet_dn, qnet_rn, encoded_data, sepsis_data):
+    traj_indices = encoded_data['traj'].unique()
+    data = {'traj': [], 'step': [], 's': [], 'a': [], 'q_dn': [], 'q_rn': [], 'category': []}
     state_cols = [k for k in encoded_data.columns if k[:2] == 's:']
     reward_col = [k for k in encoded_data.columns if k[:2] == 'r:'][0]  # only one `r` col
     action_col = [k for k in encoded_data.columns if k[:2] == 'a:'][0]  # only one `a` col
-    bar = pyprind.ProgBar(len(traj_indeces))
+    bar = pyprind.ProgBar(len(traj_indices))
     print("Making Q-values...")
-    for traj in traj_indeces:
+    for traj in traj_indices:
         bar.update()
         traj_states = encoded_data[encoded_data['traj'] == traj][state_cols].to_numpy().astype(np.float32)
-        traj_q_dn = ai_dn.get_q(traj_states)
-        traj_q_rn = ai_rn.get_q(traj_states)
+        traj_q_dn = qnet_dn.get_q(traj_states)
+        traj_q_rn = qnet_rn.get_q(traj_states)
         traj_q_dn = np.clip(traj_q_dn, -1, 0)
         traj_q_rn = np.clip(traj_q_rn, 0, 1)
         traj_r = sepsis_data[sepsis_data['traj'] == traj][reward_col].to_numpy().astype(np.float32)
@@ -62,15 +54,6 @@ def get_dn_rn_info(ai_dn, ai_rn, encoded_data, sepsis_data):
             data['a'].append(action)
             data['q_dn'].append(traj_q_dn[i, :])
             data['q_rn'].append(traj_q_rn[i, :])
-
-            s = traj_states[i, :]
-            grad_q_dn = ai_dn.get_grad(s)
-            grad_q_rn = ai_rn.get_grad(s)
-            grad_q_dn[abs(grad_q_dn) < 0.01] = 0  # noise removal
-            grad_q_rn[abs(grad_q_rn) < 0.01] = 0  # noise removal
-            data['grad_q_dn'].append(grad_q_dn)
-            data['grad_q_rn'].append(grad_q_rn)
-
             if traj_r[-1] == -1.0:
                 data['category'].append(-1)
             elif traj_r[-1] == 1.0:
@@ -138,7 +121,7 @@ def get_state_value_info(testing_idx, data):
         info['recovery']['rn_selected_q'].append(q_rn[selected_a])
         # info['recovery']['rn_rank'].append(min(len(q_rn) - np.where(np.sort(q_rn) == q_rn[selected_a])[0]))
 
-    print(min(info['death']['dn_selected_q']), max(info['death']['dn_selected_q']))  # --> max should be -1 (if testing=-1) 
+    # print(min(info['death']['dn_selected_q']), max(info['death']['dn_selected_q']))  # --> max should be -1 (if testing=-1) 
     return info
 
 
@@ -165,15 +148,14 @@ def plt_values(info, type_q, axs, nb_bar, y_string, x_verbose):  # type_q = 'sel
     hd_death_total = np.sum(hd_death)
     hr_recovery_total = np.sum(hr_recovery)
     hd_recovery_total = np.sum(hd_recovery)
-    # fig, axs = plt.subplots(1, 2, figsize=(6, 1.5), dpi=300)
     bar_weadth = 1. / (nb_bar)
-    w = (bar_weadth - (bar_weadth / 3)) / 2  # so that two bars fits nicely
+    w = (bar_weadth - (bar_weadth / 6)) / 2  # so that two bars fits nicely
     x = np.linspace(0, 1, num=nb_bar+1, endpoint=True)[:-1] + bar_weadth/2
     y = np.linspace(-1, 0, num=nb_bar+1, endpoint=True)[:-1] + bar_weadth/2
-    rects1 = axs[0].bar(x - w/2 - w/6, hr_death/hr_death_total, w, label='Non-survivors', color='navy', alpha=1)
-    rects2 = axs[0].bar(x + w/2 + w/6, hr_recovery/hr_recovery_total, w, label='Survivors', color='green', alpha=1)
-    rects3 = axs[1].bar(y - w/2 - w/6, hd_death/hd_death_total, w, label='Non-survivors', color='navy', alpha=1) 
-    rects4 = axs[1].bar(y + w/2 + w/6, hd_recovery/hd_recovery_total, w, label='Survivors', color='green', alpha=1)
+    rects1 = axs[0].bar(x - w/2, hr_death/hr_death_total, w, label='Non-survivors', color='blue', alpha=1)
+    rects2 = axs[0].bar(x + w/2, hr_recovery/hr_recovery_total, w, label='Survivors', color='green', alpha=1)
+    rects3 = axs[1].bar(y - w/2, hd_death/hd_death_total, w, label='Non-survivors', color='blue', alpha=1) 
+    rects4 = axs[1].bar(y + w/2, hd_recovery/hd_recovery_total, w, label='Survivors', color='green', alpha=1)
 
     ## NOTE: Uncomment to also label the bars (don't forget to increase fig height)
     # autolabel(axs[0], rects1, hr_death, [hr_death_total]*10)
