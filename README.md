@@ -87,9 +87,11 @@ The patient cohort provided in part 1 is extracted for general purposes. This sc
 
 ### Step 1) Train the State Construction (SC-) Network
 
-Run `ipython ./train_cortex.py`
+Run `ipython ./train_sc_network.py`
 
 Following [Killian, et al.](https://github.com/MLforHealth/rl_representations) we form state representations by processing a sequence of observations, using [AIS](https://github.com/info-structures/ais) prior to and including any time `t` as well as the last selected treatment to form the state `s_t`. The SC-Network is trained to predict the next observation, by reconstructing the latent state representation created via a recurrent encoding module.
+
+> Note: Depending on the architecture, this step can take many hours to completion. 
 
 -----
 
