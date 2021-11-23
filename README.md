@@ -2,20 +2,21 @@
 
 Machine learning has successfully framed many sequential decision making problems as either supervised prediction, or optimal decision-making policy identification via reinforcement learning. In data-constrained offline settings, both approaches may fail as they assume fully optimal behavior or rely on exploring alternatives that may not exist. Even if optimality is not attainable in such constrained cases, negative outcomes in data can be used to identify behaviors to avoid, thereby guarding against overoptimistic decisions in safety-critical domains that may be significantly biased due to reduced data availability. Along these lines we introduce an approach that identifies possible "dead-ends" of a state space. We focus on the condition of patients in the intensive care unit, where a "medical dead-end" indicates that a patient will expire, regardless of all potential future treatment sequence. We frame the discovery of these dead-ends as an RL problem, training three independent deep neural models for automated state construction, dead-end discovery and confirmation. 
 
-In this repo, we provide the code used develop a novel RL-based method, Dead-end Discovery (DeD), presented in the paper "Medical Dead-ends and Learning to Identify High-risk States and Treatments" published at NeurIPS 2021. DeD focuses on identifying _treatments to avoid_ as opposed to what treatment to select as is typical in RL-based approaches to sequential decision making in healthcare. Our goal in publishing this code is to facilitate reproducibility of our paper in hopes of motivating further research utilizing the DeD framework in safety-critical domains. 
+In this code repository, we provide the code used develop a novel RL-based method, Dead-end Discovery (DeD), presented in the paper ["Medical Dead-ends and Learning to Identify High-risk States and Treatments"](https://papers.neurips.cc/paper/2021/hash/26405399c51ad7b13b504e74eb7c696c-Abstract.html) published at [NeurIPS 2021](https://neurips.cc/Conferences/2021). DeD focuses on identifying _treatments to avoid_ as opposed to what treatment to select as is typical in RL-based approaches to sequential decision making in healthcare. Our goal in publishing this code is to facilitate reproducibility of our paper in hopes of motivating further research utilizing the DeD framework in safety-critical domains. 
 
 ## Paper
-If you use this code in your research please cite the following publication [link TBD](https://papers.neurips.cc/):
+If you use this code in your research please cite the following [publication](https://papers.neurips.cc/paper/2021/hash/26405399c51ad7b13b504e74eb7c696c-Abstract.html):
 ```
-@inproceedings{fatemi2021medical,
- title={Medical Dead-ends and Learning to Identify High-risk States and Treatments},
- author={Fatemi, Mehdi and Killian, Taylor W and Subramanian, Jayakumar and Ghassemi, Marzyeh},
- booktitle={Proceedings of the 35th International Conference on Neural Information Systems},
- year={2021}
+@article{fatemi2021medical,
+  title={Medical Dead-ends and Learning to Identify High-risk States and Treatments},
+  author={Fatemi, Mehdi and Killian, Taylor W and Subramanian, Jayakumar and Ghassemi, Marzyeh},
+  journal={Advances in Neural Information Processing Systems},
+  volume={34},
+  year={2021}
 }
 ```
 
-This paper can also be found on arXiv: [TBD](https://arxiv.org)
+This paper can also be found on arXiv at [2110.04186](https://arxiv.org/abs/2110.04186).
 
 -----
 [LICENSE](https://github.com/microsoft/med-deadend/blob/master/LICENSE)
