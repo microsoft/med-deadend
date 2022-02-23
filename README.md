@@ -85,7 +85,7 @@ We recommend using the [Anaconda](https://docs.anaconda.com/anaconda/install/) d
 
 #### Part 1: MIMIC-III Sepsis Cohort
 
-The code used to define, extract and preprocess the patient cohort from MIMIC-III can be found at [https://github.com/microsoft/mimic_sepsis](https://github.com/microsoft/mimic_sepsis). This code produces two CSV files `sepsis_final_data_K1.csv` and `sepsis_final_data_K1_RAW.csv`.
+The code used to define, extract and preprocess the patient cohort from MIMIC-III can be found at [https://github.com/microsoft/mimic_sepsis](https://github.com/microsoft/mimic_sepsis). This code produces two CSV files `sepsis_final_data_withTimes.csv` and `sepsis_final_data_RAW_withTimes.csv`.
 
 To replicate the results presented in our paper, it is expected that these two files are accessible via the directory `./data/sepsis_mimiciii/`. 
 
