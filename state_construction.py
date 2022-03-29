@@ -357,7 +357,7 @@ class StateConstructor(object):
                 for step in range(obs.shape[0]):
                     h = self.ais_gen(torch.cat((obs[step,:], a)).view(1,-1), h)
                     ais[step,:] = h
-                    # a = one_hot(actions[step], self.num_actions, data_type='torch', device=self.device)
+                    a = one_hot(actions[step], self.num_actions, data_type='torch', device=self.device)
                     # r = rewards[step]
             d['traj'][traj]['obs'] = ais.cpu().numpy()
             d['traj'][traj]['s'] = d['traj'][traj].pop('obs')  # switch to "s" (sinces it's state)
