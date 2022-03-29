@@ -113,7 +113,7 @@ Following [Killian, et al.](https://github.com/MLforHealth/rl_representations) w
 
 Run `ipython ./train_rl.py -- -f "./results/run1"`
 
-Based on the MDP formulation introduced in the paper, we train two independent DQN models to discover and confirm dead-ends and identify treatments that may leave a patient toward these unfavorable states. The networks are trained using the DDQN approach introduced by [van Hasselt, et al](https://arxiv.org/abs/1509.06461) which can be replaced by any appropriate offline RL method.
+Based on the MDP formulation introduced in the paper, we train two independent DQN models to discover and confirm dead-ends and identify treatments that may leave a patient toward these unfavorable states. The networks are trained using the DDQN approach introduced by [van Hasselt, et al](https://arxiv.org/abs/1509.06461) which can be replaced by any appropriate offline RL method. Following [Fatemi, et al.](http://proceedings.mlr.press/v97/fatemi19a.html) we also use bootstrap clipping to mitigate value overflow.
 
 ------
 
