@@ -22,9 +22,9 @@ sided_Q: 'negative'             # Constrain the values of the Q-function accordi
 # SC-Network PARAMETERS (Training the SC-Network)
 sc_method: 'AIS'                # 'AIS' or 'Observations'
 sc_resume: False                # Resumes State Constructor Training from checkpoint.pt
-sc_num_epochs: 400              # Number of epochs used for training the SC-Network. Default 200
+sc_num_epochs: 600              # Number of epochs used for training the SC-Network. Default 600
 embed_state_dim: 64             # Dimension of embeded state from SC-Network. Default 64
-sc_learning_rate: 0.0001        # Learning rate. Default 0.0001
+sc_learning_rate: 0.0005        # Learning rate. Default 0.0005
 obs_dim: 44                     # Number of feature dimensions extracted from the MIMIC EMR. Default 44
 num_actions: 25                 # Number of treatment options. Default 25
 ais_gen_model: 1                # Indicator of which Generator to use for AIS encoding of observations (see `cortex.py`)
