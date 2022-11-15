@@ -120,10 +120,12 @@ class RL(object):
         elif self.sided_Q == 'both':
             bellman_target = torch.clamp(r, max=1.0, min=-1.0) + self.gamma * torch.clamp(q2_max.detach(), max=1.0, min=-1.0) * (1 - t)
         
-        errs = (bellman_target - q_pred).unsqueeze(1)
-        quad = torch.min(torch.abs(errs), 1)[0]
-        lin = torch.abs(errs) - quad
-        loss = torch.sum(0.5 * quad.pow(2) + lin)
+        # errs = bellman_target - q_pred
+        # quad = errs.abs().clamp(max=1)
+        # lin = errs.abs() - quad
+        # loss = torch.sum(0.5 * quad.pow(2) + lin)
+
+        loss = F.smooth_l1_loss(q_pred, bellman_target)
             
         self.optimizer.zero_grad()
         loss.backward()
