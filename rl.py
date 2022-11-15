@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn as nn
 import torch.optim as optim
+import torch.nn.functional as F
 
 
 def init_weights(m):
@@ -152,10 +153,7 @@ class RL(object):
         elif self.sided_Q == 'both':
             bellman_target = torch.clamp(r, max=1.0, min=-1.0) + self.gamma * torch.clamp(q2_max.detach(), max=1.0, min=-1.0) * (1 - t)
         
-        errs = (bellman_target - q_pred).unsqueeze(1)
-        quad = torch.min(torch.abs(errs), 1)[0]
-        lin = torch.abs(errs) - quad
-        loss = torch.sum(0.5 * quad.pow(2) + lin)
+        loss = F.smooth_l1_loss(q_pred, bellman_target)
         return loss.detach().cpu().numpy()
 
     def get_q(self, s):
